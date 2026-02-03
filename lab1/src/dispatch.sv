@@ -63,17 +63,20 @@ module dispatch #(
             end
 
             for (int i = 0; i < NUM_CORES; i++) begin
-                if (core_reset[i]) begin 
+                if (core_reset[i]) begin
                     core_reset[i] <= 0;
 
                     // If this core was just reset, check if there are more blocks to be dispatched
-                    if (blocks_dispatched < total_blocks) begin 
+                    if (blocks_dispatched < total_blocks) begin
+                        // activate the core
                         core_start[i] <= 1;
+                        // set the block id for the core executing
                         core_block_id[i] <= blocks_dispatched;
-                        core_thread_count[i] <= (blocks_dispatched == total_blocks - 1) 
+                        // edge case, last block should only execute remaining threads
+                        core_thread_count[i] <= (blocks_dispatched == total_blocks - 1)
                             ? thread_count - (blocks_dispatched * THREADS_PER_BLOCK)
                             : THREADS_PER_BLOCK;
-
+                        // increment the number of blocks dispatched to the cores
                         blocks_dispatched = blocks_dispatched + 1;
                     end
                 end
