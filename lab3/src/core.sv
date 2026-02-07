@@ -123,6 +123,7 @@ module core #(
         .decoded_mem_write_enable(decoded_mem_write_enable),
         .decoded_ret(decoded_ret),
         .lsu_state(lsu_state),
+        .thread_count(thread_count),
         .current_pc(current_pc),
         .next_pc(next_pc),
         .done(done)

@@ -11,8 +11,11 @@ EXTRA_VVP_ARGS = -M $(shell cocotb-config --prefix)/cocotb/libs \
                  -m libcocotbvpi_icarus
 
 # "make lab3 test_matmul" => re-run make with LAB=lab3 and remaining goals
-lab1 lab3:
+lab1:
 	@$(MAKE) LAB=$@ $(filter-out $@,$(MAKECMDGOALS))
+lab3:
+	@$(MAKE) LAB=$@ $(filter-out $@,$(MAKECMDGOALS))
+
 
 # Ensure build directory exists
 $(BUILD_DIR):
