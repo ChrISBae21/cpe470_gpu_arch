@@ -62,9 +62,6 @@ module dispatch #(
             // EDA: Indirect way to get @(posedge start) without driving from 2 different clocks
             if (!start_execution) begin
                 start_execution <= 1'b1;
-                // done <= 1'b0;
-                // blocks_done <= 8'd0;
-                // dispatched_mask <= {MAX_BLOCKS{1'b0}};
                 for (int i = 0; i < NUM_CORES; i++) begin
                     core_reset[i] <= 1'b1;
                     core_start[i] <= 1'b0;
@@ -76,14 +73,14 @@ module dispatch #(
                 done <= 1'b1;
             end
 
-            // DISPATCH: allocate distinct blocks to all available cores ----
+            // DISPATCH: allocate distinct blocks to all available cores
             temp_mask = dispatched_mask; // local temp
 
             for (int i = 0; i < NUM_CORES; i++) begin
                 if (core_reset[i]) begin
                     core_reset[i] <= 1'b0;
 
-                    // ----- INLINE PICK: choose lowest block id not yet dispatched (< total_blocks) -----
+                    // choose lowest block id not yet dispatched (< total_blocks)
                     found_local = 1'b0;
                     chosen_id   = 8'd0;
 
@@ -111,7 +108,7 @@ module dispatch #(
             // commit after assigning all cores
             dispatched_mask <= temp_mask;
 
-            // ---- COMPLETION PHASE ----
+            // COMPLETION PHASE
             for (int i = 0; i < NUM_CORES; i = i + 1) begin
                 if (core_start[i] && core_done[i]) begin
                     // If a core just finished executing it's current block, reset it
