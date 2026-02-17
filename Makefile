@@ -15,6 +15,8 @@ lab1:
 	@$(MAKE) LAB=$@ $(filter-out $@,$(MAKECMDGOALS))
 lab3:
 	@$(MAKE) LAB=$@ $(filter-out $@,$(MAKECMDGOALS))
+final:
+	@$(MAKE) LAB=$@ $(filter-out $@,$(MAKECMDGOALS))
 
 
 # Ensure build directory exists
