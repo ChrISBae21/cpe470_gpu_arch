@@ -5,7 +5,6 @@
 // > The GPU has one dispatch unit at the top level
 // > Manages processing of threads and marks kernel execution as done
 // > Sends off batches of threads in blocks to be executed by available compute cores
-
 module dispatch #(
     parameter NUM_CORES = 2,
     parameter THREADS_PER_BLOCK = 4,

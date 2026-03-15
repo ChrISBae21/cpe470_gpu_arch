@@ -10,7 +10,8 @@ module core #(
     parameter DATA_MEM_DATA_BITS = 8,
     parameter PROGRAM_MEM_ADDR_BITS = 8,
     parameter PROGRAM_MEM_DATA_BITS = 16,
-    parameter THREADS_PER_BLOCK = 4
+    parameter THREADS_PER_BLOCK = 8,
+    parameter WARP_SIZE = 4
 ) (
     input wire clk,
     input wire reset,
@@ -40,12 +41,14 @@ module core #(
     input reg [THREADS_PER_BLOCK-1:0] data_mem_write_ready
 );
     // State
-    reg [2:0] core_state;
+    // reg [2:0] core_state;
+    wire [2:0] core_state;
     reg [2:0] fetcher_state;
     reg [15:0] instruction;
 
     // Intermediate Signals
-    reg [7:0] current_pc;
+    // reg [7:0] current_pc;
+    wire [7:0] current_pc;
     wire [7:0] next_pc[THREADS_PER_BLOCK-1:0];
     reg [7:0] rs[THREADS_PER_BLOCK-1:0];
     reg [7:0] rt[THREADS_PER_BLOCK-1:0];
@@ -70,6 +73,10 @@ module core #(
     reg decoded_alu_output_mux;             // Select operation in ALU
     reg decoded_pc_mux;                     // Select source of next PC
     reg decoded_ret;
+
+
+    localparam integer NUM_WARPS = THREADS_PER_BLOCK / WARP_SIZE;
+    wire [$clog2(NUM_WARPS)-1:0] active_warp;
 
     // Fetcher
     fetcher #(
@@ -110,34 +117,40 @@ module core #(
         .decoded_ret(decoded_ret)
     );
 
-    // Scheduler
-    scheduler #(
-        .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
+    warp_scheduler #(
+    .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
+    .WARP_SIZE(WARP_SIZE)
     ) scheduler_instance (
-        .clk(clk),
-        .reset(reset),
-        .start(start),
-        .fetcher_state(fetcher_state),
-        .core_state(core_state),
-        .decoded_mem_read_enable(decoded_mem_read_enable),
-        .decoded_mem_write_enable(decoded_mem_write_enable),
-        .decoded_ret(decoded_ret),
-        .lsu_state(lsu_state),
-        .thread_count(thread_count),
-        .current_pc(current_pc),
-        .next_pc(next_pc),
-        .done(done)
+    .clk(clk),
+    .reset(reset),
+    .start(start),
+
+    .decoded_ret(decoded_ret),
+
+    .fetcher_state(fetcher_state),
+    .lsu_state(lsu_state),
+    .thread_count(thread_count),
+    .next_pc(next_pc),
+
+    .current_pc(current_pc),
+    .core_state(core_state),
+    .done(done),
+    .active_warp(active_warp)
     );
 
     // Dedicated ALU, LSU, registers, & PC unit for each thread this core has capacity for
     genvar i;
     generate
         for (i = 0; i < THREADS_PER_BLOCK; i++) begin : threads
+            localparam integer WARP_ID = i / WARP_SIZE;   // constant at elaboration (genvar)
+            wire lane_enable = (i < thread_count) && (active_warp == WARP_ID[$clog2(NUM_WARPS)-1:0]);
+            
             // ALU
             alu alu_instance (
                 .clk(clk),
                 .reset(reset),
-                .enable(i < thread_count),
+                // .enable(i < thread_count),
+                .enable(lane_enable),
                 .core_state(core_state),
                 .decoded_alu_arithmetic_mux(decoded_alu_arithmetic_mux),
                 .decoded_alu_output_mux(decoded_alu_output_mux),
@@ -150,7 +163,8 @@ module core #(
             lsu lsu_instance (
                 .clk(clk),
                 .reset(reset),
-                .enable(i < thread_count),
+                // .enable(i < thread_count),
+                .enable(lane_enable),
                 .core_state(core_state),
                 .decoded_mem_read_enable(decoded_mem_read_enable),
                 .decoded_mem_write_enable(decoded_mem_write_enable),
@@ -176,7 +190,8 @@ module core #(
             ) register_instance (
                 .clk(clk),
                 .reset(reset),
-                .enable(i < thread_count),
+                // .enable(i < thread_count),
+                .enable(lane_enable),
                 .block_id(block_id),
                 .core_state(core_state),
                 .decoded_reg_write_enable(decoded_reg_write_enable),
@@ -198,7 +213,8 @@ module core #(
             ) pc_instance (
                 .clk(clk),
                 .reset(reset),
-                .enable(i < thread_count),
+                // .enable(i < thread_count),
+                .enable(lane_enable),
                 .core_state(core_state),
                 .decoded_nzp(decoded_nzp),
                 .decoded_immediate(decoded_immediate),

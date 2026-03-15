@@ -15,7 +15,8 @@ module gpu #(
     parameter PROGRAM_MEM_DATA_BITS = 16,    // Number of bits in program memory value (16 bit instruction)
     parameter PROGRAM_MEM_NUM_CHANNELS = 1,  // Number of concurrent channels for sending requests to program memory
     parameter NUM_CORES = 2,                 // Number of cores to include in this GPU
-    parameter THREADS_PER_BLOCK = 4          // Number of threads to handle per block (determines the compute resources of each core)
+    parameter THREADS_PER_BLOCK = 8,         // Number of threads to handle per block (determines the compute resources of each core)
+    parameter THREADS_PER_WARP = 4
 ) (
     input wire clk,
     input wire reset,
@@ -153,7 +154,7 @@ module gpu #(
     // Compute Cores
     genvar i;
     generate
-        for (i = 0; i < NUM_CORES; i = i + 1) begin : cores
+        for (i = 0; i < NUM_CORES; i++) begin : cores
             // EDA: We create separate signals here to pass to cores because of a requirement
             // by the OpenLane EDA flow (uses Verilog 2005) that prevents slicing the top-level signals
             reg [THREADS_PER_BLOCK-1:0] core_lsu_read_valid;
@@ -190,6 +191,7 @@ module gpu #(
                 .PROGRAM_MEM_ADDR_BITS(PROGRAM_MEM_ADDR_BITS),
                 .PROGRAM_MEM_DATA_BITS(PROGRAM_MEM_DATA_BITS),
                 .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
+                .WARP_SIZE(THREADS_PER_WARP )
             ) core_instance (
                 .clk(clk),
                 .reset(core_reset[i]),

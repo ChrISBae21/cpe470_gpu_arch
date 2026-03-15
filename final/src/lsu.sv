@@ -47,6 +47,12 @@ module lsu (
             mem_write_address <= 0;
             mem_write_data <= 0;
         end else if (enable) begin
+            // Safety: if we aren't in an active memory instruction, keep valids low
+            if (!decoded_mem_read_enable && !decoded_mem_write_enable) begin
+                mem_read_valid  <= 1'b0;
+                mem_write_valid <= 1'b0;
+            end
+            
             // If memory read enable is triggered (LDR instruction)
             if (decoded_mem_read_enable) begin 
                 case (lsu_state)
@@ -78,7 +84,7 @@ module lsu (
             end
 
             // If memory write enable is triggered (STR instruction)
-            if (decoded_mem_write_enable) begin 
+            else if (decoded_mem_write_enable) begin 
                 case (lsu_state)
                     IDLE: begin
                         // Only read when core_state = REQUEST

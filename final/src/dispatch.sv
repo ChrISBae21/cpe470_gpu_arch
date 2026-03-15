@@ -8,7 +8,7 @@
 
 module dispatch #(
     parameter NUM_CORES = 2,
-    parameter THREADS_PER_BLOCK = 4,
+    parameter THREADS_PER_BLOCK = 8,
     parameter MAX_BLOCKS = 256,
     parameter PRIO_BITS = 4   // kept for compatibility; unused in this FIFO version
 ) (
