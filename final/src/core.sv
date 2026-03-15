@@ -117,6 +117,7 @@ module core #(
         .decoded_ret(decoded_ret)
     );
 
+    // using warp scheduler
     warp_scheduler #(
     .THREADS_PER_BLOCK(THREADS_PER_BLOCK),
     .WARP_SIZE(WARP_SIZE)

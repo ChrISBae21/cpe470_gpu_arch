@@ -9,7 +9,7 @@ module warp_scheduler #(
     input  wire reset,
     input  wire start,
 
-    // decoded signals (for current instruction)
+    // decoded signals
     input  wire decoded_ret,
 
     // fetcher/lsu state
@@ -23,7 +23,7 @@ module warp_scheduler #(
     input  wire [7:0] next_pc [THREADS_PER_BLOCK-1:0],
 
     // outputs
-    output reg  [7:0] current_pc,
+    output wire [7:0] current_pc,
     output reg  [2:0] core_state,
     output reg  done,
     output reg  [$clog2(THREADS_PER_BLOCK/WARP_SIZE)-1:0] active_warp
@@ -38,33 +38,27 @@ module warp_scheduler #(
                WAIT    = 3'b100,
                EXECUTE = 3'b101,
                UPDATE  = 3'b110,
-               DONE_S  = 3'b111;
+               DONE  = 3'b111;
 
     reg [7:0] warp_pc   [NUM_WARPS-1:0];
     reg       warp_done [NUM_WARPS-1:0];
 
-    // pending memory in warp w?
-    function automatic warp_mem_pending(input integer w);
-        integer l, tid;
-        begin
-            warp_mem_pending = 1'b0;
-            for (l = 0; l < WARP_SIZE; l = l + 1) begin
-                tid = w*WARP_SIZE + l;
-                if (tid < thread_count) begin
-                    if (lsu_state[tid] == 2'b01 || lsu_state[tid] == 2'b10) begin
-                        warp_mem_pending = 1'b1;
-                    end
-                end
+    // check if any warp is waiting on memory request
+    reg     mem_pending;
+    integer l, tid_mp;
+    always_comb begin
+        mem_pending = 1'b0;
+        for (l = 0; l < WARP_SIZE; l = l + 1) begin
+            tid_mp = active_warp * WARP_SIZE + l;
+            if (tid_mp < thread_count) begin
+                if (lsu_state[tid_mp] == 2'b01 || lsu_state[tid_mp] == 2'b10)
+                    mem_pending = 1'b1;
             end
         end
-    endfunction
+    end
 
-    // does this warp have any lanes at all?
-    function automatic warp_empty(input integer w);
-        begin
-            warp_empty = ((w*WARP_SIZE) >= thread_count);
-        end
-    endfunction
+    // current_pc: always reflects the active warp's PC immediately
+    assign current_pc = warp_pc[active_warp];
 
     integer w;
 
@@ -73,7 +67,6 @@ module warp_scheduler #(
             core_state  <= IDLE;
             done        <= 1'b0;
             active_warp <= '0;
-            current_pc  <= 8'd0;
 
             for (w = 0; w < NUM_WARPS; w = w + 1) begin
                 warp_pc[w]   <= 8'd0;
@@ -81,9 +74,6 @@ module warp_scheduler #(
             end
 
         end else begin
-            // drive current_pc from active warp
-            current_pc <= warp_pc[active_warp];
-
             case (core_state)
                 IDLE: begin
                     done <= 1'b0;
@@ -91,20 +81,20 @@ module warp_scheduler #(
                         // init per-warp pc and mark empty warps as already done
                         for (w = 0; w < NUM_WARPS; w = w + 1) begin
                             warp_pc[w]   <= 8'd0;
-                            warp_done[w] <= warp_empty(w);
+                            warp_done[w] <= (w * WARP_SIZE >= thread_count);
                         end
 
-                        // pick first non-empty warp (for NUM_WARPS=2 this is easy)
-                        if (!warp_empty(0)) begin
+                        // pick first non-empty warp
+                        if (!(0 * WARP_SIZE >= thread_count)) begin
                             active_warp <= 0;
                             core_state  <= FETCH;
-                        end else if (!warp_empty(1)) begin
+                        end else if (!(1 * WARP_SIZE >= thread_count)) begin
                             active_warp <= 1;
                             core_state  <= FETCH;
                         end else begin
                             // thread_count == 0 case: immediately done
                             done <= 1'b1;
-                            core_state <= DONE_S;
+                            core_state <= DONE;
                         end
                     end
                 end
@@ -125,7 +115,7 @@ module warp_scheduler #(
 
                 WAIT: begin
                     // stall until active warp's mem ops finish
-                    if (!warp_mem_pending(active_warp)) begin
+                    if (!mem_pending) begin
                         core_state <= EXECUTE;
                     end
                 end
@@ -141,16 +131,16 @@ module warp_scheduler #(
                         // advance to next non-done warp, else finish
                         if (active_warp == NUM_WARPS-1) begin
                             done <= 1'b1;
-                            core_state <= DONE_S;
+                            core_state <= DONE;
                         end else begin
-                            // for NUM_WARPS=2: next is 1
+                            // check if warps are done
                             if (!warp_done[active_warp + 1'b1]) begin
                                 active_warp <= active_warp + 1'b1;
                                 core_state  <= FETCH;
                             end else begin
                                 // next warp is empty/already done => finish
                                 done <= 1'b1;
-                                core_state <= DONE_S;
+                                core_state <= DONE;
                             end
                         end
 
@@ -161,8 +151,8 @@ module warp_scheduler #(
                     end
                 end
 
-                DONE_S: begin
-                    // hold
+                DONE: begin
+                    
                 end
             endcase
         end

@@ -28,10 +28,7 @@ module alu (
     reg [7:0] alu_out_reg;
     assign alu_out = alu_out_reg;
 
-    // CMP / NZP flags (toolchain-safe style: no wire initializers)
-    // > diff is computed as rs - rt (two's complement)
-    // > N is MSB of diff, Z is diff==0, P is (!N && !Z)
-    // > alu_out[2:0] encodes NZP in bits [2:0] = {N,Z,P}
+    // ran into issues with signed bits, so abstracted here
     wire [7:0] diff;
     assign diff = rs - rt;
 
@@ -52,9 +49,7 @@ module alu (
             if (core_state == 3'b101) begin
                 if (decoded_alu_output_mux == 1'b1) begin
                     // Set values to compare with NZP register in alu_out[2:0]
-                    // alu_out[2:0] = N Z P
-                    alu_out_reg <= {5'b0, 1'b1, (rs - rt == 0), (rs - rt < 0)};
-                    // alu_out_reg <= {5'b0, n_flag, z_flag, p_flag};
+                    alu_out_reg <= {5'b0, n_flag, z_flag, p_flag};
                 end else begin
                     // Execute the specified arithmetic instruction
                     case (decoded_alu_arithmetic_mux)
